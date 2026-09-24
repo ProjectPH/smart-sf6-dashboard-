@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMART SF6 Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .animate-pulse-fast { animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    </style>
+</head>
+<body class="bg-gray-100 pb-10">
+
+    <nav class="bg-blue-900 text-white p-4 shadow-md">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold">⚡ SMART SF6 ESG Dashboard</h1>
+            <span class="text-sm bg-blue-700 px-3 py-1 rounded">Phuket & Boorvi Substation</span>
+        </div>
+    </nav>
+
+    <div id="alert-container" class="container mx-auto mt-4 px-4 hidden">
+        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 shadow rounded flex items-center justify-between" role="alert">
+            <div>
+                <p class="font-bold">⚠️ แจ้งเตือนวิกฤต (Critical Alert)!</p>
+                <p id="alert-message">ตรวจพบตู้ GIS มีแรงดันตกถึงขีดอันตราย</p>
+            </div>
+            <button onclick="closeAlert()" class="text-red-700 font-bold hover:text-red-900">ปิด (X)</button>
+        </div>
+    </div>
+
+    <div class="container mx-auto p-4 mt-4">
+        
+        <!-- ข้อมูลสรุปด้านสิ่งแวดล้อม -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-white p-4 rounded-lg shadow border-t-4 border-green-500">
+                <h2 class="text-gray-500 font-semibold">ปริมาณก๊าซที่กู้คืนได้</h2>
+                <p class="text-3xl font-bold text-green-600">60.0 <span class="text-lg">kg</span></p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow border-t-4 border-blue-500">
+                <h2 class="text-gray-500 font-semibold">การลดคาร์บอน (GHG Reduction)</h2>
+                <p class="text-3xl font-bold text-blue-600">1,410.00 <span class="text-lg">tCO2e</span></p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow border-t-4 border-purple-500">
+                <h2 class="text-gray-500 font-semibold">สถานะเซนเซอร์ทั้งหมด</h2>
+                <p class="text-3xl font-bold text-purple-600">4/4 <span class="text-lg">Online</span></p>
+            </div>
+        </div>
+
+        <!-- ตารางที่ 1: สถานะตู้ GIS -->
+        <div class="bg-white rounded-lg shadow overflow-hidden mb-8">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <h2 class="text-lg font-bold text-gray-800">📊 ตารางที่ 1: สถานะตู้ GIS (IoT Sensor & Alert)</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-600 text-sm uppercase">
+                            <th class="py-3 px-6">รหัสตู้</th>
+                            <th class="py-3 px-6">ประเภท</th>
+                            <th class="py-3 px-6">ความดัน (Bar)</th>
+                            <th class="py-3 px-6">วันถึงขีดอันตราย</th>
+                            <th class="py-3 px-6 text-center">สถานะ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gis-table-body" class="text-gray-700"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ตารางที่ 2: ระบบติดตามถังก๊าซ -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <h2 class="text-lg font-bold text-gray-800">♻️ ตารางที่ 2: การจัดการก๊าซหมุนเวียน (Regeneration Workflow)</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-600 text-sm uppercase">
+                            <th class="py-3 px-6">รหัส QR ถัง</th>
+                            <th class="py-3 px-6">ตู้ต้นทาง</th>
+                            <th class="py-3 px-6">ความบริสุทธิ์ (%)</th>
+                            <th class="py-3 px-6">ความชื้น (ppmv)</th>
+                            <th class="py-3 px-6 text-center">สถานะการตรวจสอบ (QC)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tank-table-body" class="text-gray-700"></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ข้อมูลจำลองตารางที่ 1 (GIS Cabinets)
+        const gisData = [
+            { id: "GIS-HV-01", type: "HV", pressure: "6.50", days: "> 30", status: "green" },
+            { id: "GIS-EHV-02", type: "EHV", pressure: "5.80", days: "14", status: "yellow" },
+            { id: "GIS-HV-03", type: "HV", pressure: "4.90", days: "3", status: "red" }, // ทำให้เกิด Alert
+            { id: "GIS-EHV-04", type: "EHV", pressure: "6.48", days: "> 30", status: "green" }
+        ];
+
+        // ข้อมูลจำลองตารางที่ 2 (Tanks)
+        const tankData = [
+            { qr: "TANK-QR-001", source: "GIS-HV-03", purity: 99.5, moisture: 15.0 },
+            { qr: "TANK-QR-002", source: "GIS-EHV-02", purity: 98.2, moisture: 35.0 },
+            { qr: "TANK-QR-003", source: "GIS-HV-05", purity: 99.8, moisture: 10.5 }
+        ];
+
+        function getGisBadge(status) {
+            if (status === 'green') return `<span class="bg-green-100 text-green-800 py-1 px-3 rounded-full text-sm font-bold">🟢 ปกติ</span>`;
+            if (status === 'yellow') return `<span class="bg-yellow-100 text-yellow-800 py-1 px-3 rounded-full text-sm font-bold">🟡 เฝ้าระวัง</span>`;
+            if (status === 'red') return `<span class="bg-red-100 text-red-800 py-1 px-3 rounded-full text-sm font-bold animate-pulse-fast">🔴 วิกฤต</span>`;
+        }
+
+        // เช็คมาตรฐาน IEC 60376
+        function getTankBadge(purity, moisture) {
+            if (purity >= 99.0 && moisture <= 25) {
+                return `<span class="bg-green-100 text-green-800 py-1 px-3 rounded-full text-sm font-bold">✅ พร้อมใช้งาน 100%</span>`;
+            } else {
+                return `<span class="bg-yellow-100 text-yellow-800 py-1 px-3 rounded-full text-sm font-bold">🔄 กำลังบำบัด</span>`;
+            }
+        }
+
+        function renderTables() {
+            // Render ตาราง GIS
+            const gisBody = document.getElementById('gis-table-body');
+            let criticalCabinets = [];
+            gisData.forEach(item => {
+                gisBody.innerHTML += `
+                    <td class="py-3 px-6 font-semibold">${item.id}</td>
+                    <td class="py-3 px-6">${item.type}</td>
+                    <td class="py-3 px-6">${item.pressure}</td>
+                    <td class="py-3 px-6">${item.days}</td>
+                    <td class="py-3 px-6 text-center">${getGisBadge(item.status)}</td>
+                `;
+                if (item.status === 'red') criticalCabinets.push(item.id);
+            });
+            if (criticalCabinets.length > 0) showAlert(criticalCabinets);
+
+            // Render ตาราง ถังก๊าซ
+            const tankBody = document.getElementById('tank-table-body');
+            tankData.forEach(item => {
+                tankBody.innerHTML += `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="py-3 px-6 font-semibold">${item.qr}</td>
+                        <td class="py-3 px-6">${item.source}</td>
+                        <td class="py-3 px-6">${item.purity}%</td>
+                        <td class="py-3 px-6">${item.moisture}</td>
+                        <td class="py-3 px-6 text-center">${getTankBadge(item.purity, item.moisture)}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function showAlert(cabinets) {
+            document.getElementById('alert-message').innerHTML = `พบการรั่วไหลวิกฤตที่ตู้: <b>${cabinets.join(', ')}</b> กรุณาสร้าง Job Order ให้ช่างเข้าบำรุงรักษาทันที!`;
+            document.getElementById('alert-container').classList.remove('hidden');
+        }
+
+        function closeAlert() {
+            document.getElementById('alert-container').classList.add('hidden');
+        }
+
+        window.onload = renderTables;
+    </script>
+</body>
+</html>
